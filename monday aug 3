@@ -13,27 +13,26 @@ from adafruit_esp32spi import adafruit_esp32spi
 import adafruit_requests as requests
 import busio
 from digitalio import DigitalInOut
-import adafruit_esp32spi.adafruit_esp32spi_socket as socket
 
 
 esp32_cs = DigitalInOut(board.ESP_CS)
 esp32_ready = DigitalInOut(board.ESP_BUSY)
 esp32_reset = DigitalInOut(board.ESP_RESET)
 
+i2c = busio.I2C(board.SCL, board.SDA)
+mpu = adafruit_mpu6050.MPU6050(i2c)
+
 
 spi = busio.SPI(board.SCK, board.MOSI, board.MISO)
 
 esp = adafruit_esp32spi.ESP_SPIcontrol(spi, esp32_cs, esp32_ready, esp32_reset)
-
 
 requests.set_socket(socket, esp)
 
 dot = neopixel.NeoPixel(board.NEOPIXEL, 1, brightness=0.2)
 
 
-i2c = busio.I2C(board.SCL, board.SDA)
-mpu = adafruit_mpu6050.MPU6050(i2c)
-
+h = 0
 
 if esp.status == adafruit_esp32spi.WL_IDLE_STATUS:
     print("ESP32 found and in idle mode")
@@ -48,9 +47,17 @@ while not esp.is_connected:
 print("Connected to", str(esp.ssid, "utf-8"), "\tRSSI:", esp.rssi)
 
 
-h = 0
+
+if h == 0:
+    try:
+        k= requests.post("http://608dev.net/sandbox/mostec/helmet?player1=0")
+    except Exception as e:
+        print(e)
+
+
 
 while True:
+
     if ((mpu.acceleration[0] >= (18.5)) and (mpu.acceleration[1] >= (18.5)) and (mpu.acceleration[2] <= (-18.5))):
         try:
             r = requests.get("http://608dev.net/sandbox/mostec/helmet?player1")
@@ -60,12 +67,12 @@ while True:
             n = requests.post(f"http://608dev.net/sandbox/mostec/helmet?player1={h}")
         except Exception as e:
             print(e)
-    print(mpu.acceleration)
-    print (h)
-    
+
+        time.sleep(0.05)
+
     if ((mpu.acceleration[0] < (18.5)) and (mpu.acceleration[1] < (18.5)) and (mpu.acceleration[2] > (-18.5))):
         dot[0] = [0,255,0]
-        
+
     if h == 2:
         dot[0] = [100,255,0]
 
@@ -77,18 +84,12 @@ while True:
 
     elif h >= 5:
         dot[0] = [255,0,0]
-    print (h)
     time.sleep(0.05)
-    
-    if h >= 10:
-        try:
-            r = requests.get("http://608dev.net/sandbox/mostec/helmet?player1")
-            r = eval(r.text)
-            h = int (r['player1'])
-            h += 1
-            n = requests.post(f"http://608dev.net/sandbox/mostec/helmet?player1={h}")
-        except Exception as e:
-            print(e)
+
+    print (h)
+
+    print(mpu.acceleration)
+
 
 
 time.sleep(0.05)
